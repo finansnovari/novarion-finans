@@ -211,6 +211,11 @@ export const useStore = create<AppState>((set, get) => ({
     if (!newTr.category_id) delete newTr.category_id;
     if (!newTr.account_id) delete newTr.account_id;
     
+    // Remove joined fields before insert
+    delete newTr.account_name;
+    delete newTr.category_name;
+    delete newTr.contact_name;
+    
     const { data: insertedTr, error } = await supabase.from('transactions').insert([newTr]).select().single();
     if (error) {
       get().addToast({ type: 'error', title: 'Hata', message: error.message });
@@ -242,14 +247,49 @@ export const useStore = create<AppState>((set, get) => ({
   },
   updateTransaction: async (id, data) => {
     const { supabase } = await import('@/lib/supabase');
+    const oldTr = get().transactions.find((t) => t.id === id);
+    
     const updateData: any = { ...data };
     if (updateData.contact_id === "") updateData.contact_id = null;
     if (updateData.category_id === "") updateData.category_id = null;
     if (updateData.account_id === "") updateData.account_id = null;
     
+    // Remove joined fields before update
+    delete updateData.account_name;
+    delete updateData.category_name;
+    delete updateData.contact_name;
+    
     const { error } = await supabase.from('transactions').update(updateData).eq('id', id);
-    if (!error) {
+    if (!error && oldTr) {
+      const newTr = { ...oldTr, ...updateData };
+      
+      // If amount, type or account changed, recalculate
+      if (oldTr.amount !== newTr.amount || oldTr.type !== newTr.type || oldTr.account_id !== newTr.account_id) {
+        // Rollback old
+        if (oldTr.account_id) {
+          const acc = get().accounts.find(a => a.id === oldTr.account_id);
+          if (acc) {
+            let rollback = acc.balance;
+            if (oldTr.type === 'income') rollback -= oldTr.amount;
+            else if (oldTr.type === 'expense') rollback += oldTr.amount;
+            await supabase.from('accounts').update({ balance: rollback }).eq('id', acc.id);
+          }
+        }
+        // Apply new
+        if (newTr.account_id) {
+          // Fetch fresh account in case it's the same one we just rollbacked
+          const { data: freshAcc } = await supabase.from('accounts').select('balance').eq('id', newTr.account_id).single();
+          if (freshAcc) {
+            let apply = freshAcc.balance;
+            if (newTr.type === 'income') apply += newTr.amount;
+            else if (newTr.type === 'expense') apply -= newTr.amount;
+            await supabase.from('accounts').update({ balance: apply }).eq('id', newTr.account_id);
+          }
+        }
+      }
+      
       await get().initSupabase();
+      get().addToast({ type: 'success', title: 'İşlem güncellendi' });
     }
   },
   deleteTransaction: async (id) => {
@@ -344,6 +384,10 @@ export const useStore = create<AppState>((set, get) => ({
     if (!newPayment.contact_id) delete newPayment.contact_id;
     if (!newPayment.account_id) delete newPayment.account_id;
     
+    // Remove joined fields before insert
+    delete newPayment.account_name;
+    delete newPayment.contact_name;
+    
     const { data, error } = await supabase.from('payments').insert([newPayment]).select().single();
     if (error) {
       get().addToast({ type: 'error', title: 'Hata', message: error.message });
@@ -357,6 +401,10 @@ export const useStore = create<AppState>((set, get) => ({
     const updateData: any = { ...data };
     if (updateData.contact_id === "") updateData.contact_id = null;
     if (updateData.account_id === "") updateData.account_id = null;
+    
+    // Remove joined fields before update
+    delete updateData.account_name;
+    delete updateData.contact_name;
     
     const { error } = await supabase.from('payments').update(updateData).eq('id', id);
     if (!error) {
