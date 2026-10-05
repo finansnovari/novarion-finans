@@ -24,7 +24,7 @@ import Topbar from '@/components/layout/Topbar';
 
 export default function DashboardPage() {
   const { 
-    accounts, transactions, payments, 
+    accounts, transactions, payments, categories,
     theme, isDemoMode 
   } = useStore();
 
@@ -71,12 +71,13 @@ export default function DashboardPage() {
 
   // Prepare Expense by Category for Pie Chart
   const categoryExpenses = useMemo(() => {
-    const expenses = monthlyTransactions.filter(t => t.type === 'expense' && t.category_name);
+    const expenses = monthlyTransactions.filter(t => t.type === 'expense' && t.category_id);
     const byCategory: Record<string, number> = {};
     
     expenses.forEach(t => {
-      if (t.category_name) {
-        byCategory[t.category_name] = (byCategory[t.category_name] || 0) + t.amount;
+      if (t.category_id) {
+        const catName = categories.find(c => c.id === t.category_id)?.name || 'Diğer';
+        byCategory[catName] = (byCategory[catName] || 0) + t.amount;
       }
     });
 
