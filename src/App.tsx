@@ -62,7 +62,7 @@ function App() {
   }
 
   return (
-    <Router>
+    <Router basename="/novarion-finans">
       <Routes>
         <Route 
           path="/giris" 
