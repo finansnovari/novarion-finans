@@ -93,16 +93,29 @@ export default function DashboardPage() {
       .slice(0, 5); // Top 5
   }, [monthlyTransactions]);
 
-  // Use imported demo data for main chart if in demo mode, otherwise use actual
-  // To keep it simple, we'll just mock a 6-month view based on current month if not demo
-  const cashFlowData = [
-    { name: 'May', gelir: 178000, gider: 138000 },
-    { name: 'Haz', gelir: 192000, gider: 155000 },
-    { name: 'Tem', gelir: 185000, gider: 148000 },
-    { name: 'Ağu', gelir: 210000, gider: 162000 },
-    { name: 'Eyl', gelir: 198000, gider: 158000 },
-    { name: 'Eki', gelir: monthlyIncome || 168000, gider: monthlyExpense || 159350 },
-  ];
+  const cashFlowData = useMemo(() => {
+    const data = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const monthLabel = d.toLocaleString('tr-TR', { month: 'short' });
+      const m = d.getMonth();
+      const y = d.getFullYear();
+      
+      const mIncome = transactions.filter(t => {
+        const td = new Date(t.date);
+        return t.type === 'income' && t.status === 'completed' && td.getMonth() === m && td.getFullYear() === y;
+      }).reduce((acc, t) => acc + t.amount, 0);
+      
+      const mExpense = transactions.filter(t => {
+        const td = new Date(t.date);
+        return t.type === 'expense' && t.status === 'completed' && td.getMonth() === m && td.getFullYear() === y;
+      }).reduce((acc, t) => acc + t.amount, 0);
+
+      data.push({ name: monthLabel, gelir: mIncome, gider: mExpense });
+    }
+    return data;
+  }, [transactions]);
 
   const recentTransactions = transactions.slice(0, 5);
   const upcomingPayments = payments.filter(p => p.status === 'pending' || p.status === 'partial' || p.status === 'overdue').sort((a,b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()).slice(0, 4);
